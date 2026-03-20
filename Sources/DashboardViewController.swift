@@ -120,11 +120,6 @@ final class DashboardViewController: NSViewController {
         }
 
         // View Capability Map button
-        let spacer = NSView()
-        spacer.translatesAutoresizingMaskIntoConstraints = false
-        spacer.heightAnchor.constraint(equalToConstant: 8).isActive = true
-        stackView.addArrangedSubview(spacer)
-
         let capButton = NSButton(title: "View Capability Map", target: self, action: #selector(capabilityMapClicked))
         capButton.bezelStyle = .rounded
         capButton.controlSize = .large
@@ -136,10 +131,11 @@ final class DashboardViewController: NSViewController {
     }
 
     private func makeStatCard(symbol: String, count: Int, label: String, color: NSColor) -> NSView {
-        let card = NSView()
-        card.wantsLayer = true
-        card.layer?.backgroundColor = NSColor.quaternaryLabelColor.cgColor
-        card.layer?.cornerRadius = 8
+        let card = NSBox()
+        card.boxType = .custom
+        card.fillColor = .quaternaryLabelColor
+        card.cornerRadius = 8
+        card.borderWidth = 0
 
         let stack = NSStackView()
         stack.orientation = .vertical

@@ -394,25 +394,20 @@ final class DetailViewController: NSViewController {
     private func makeBadge(_ text: String, color: NSColor) -> NSView {
         let label = NSTextField(labelWithString: text)
         label.font = .systemFont(ofSize: 10, weight: .medium)
-        label.textColor = .white
-        label.backgroundColor = color
-        label.drawsBackground = true
+        label.textColor = color
+        label.drawsBackground = false
         label.isBezeled = false
         label.alignment = .center
-
-        let container = NSView()
-        container.wantsLayer = true
-        container.layer?.backgroundColor = color.cgColor
-        container.layer?.cornerRadius = 4
         label.translatesAutoresizingMaskIntoConstraints = false
-        container.addSubview(label)
-        NSLayoutConstraint.activate([
-            label.topAnchor.constraint(equalTo: container.topAnchor, constant: 2),
-            label.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -2),
-            label.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 6),
-            label.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -6),
-        ])
-        return container
+
+        let box = NSBox()
+        box.boxType = .custom
+        box.fillColor = color.withAlphaComponent(0.15)
+        box.cornerRadius = 4
+        box.borderWidth = 0
+        box.contentViewMargins = NSSize(width: 6, height: 2)
+        box.contentView = label
+        return box
     }
 
     @objc private func revealInFinder() {
