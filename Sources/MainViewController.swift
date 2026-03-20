@@ -1,6 +1,13 @@
 import AppKit
 
-final class MainViewController: NSSplitViewController, SkillListDelegate, DetailViewDelegate, DashboardDelegate, CapabilityMapDelegate {
+extension NSToolbarItem.Identifier {
+    static let sidebarTrackingSeparator = NSToolbarItem.Identifier("sidebarTrackingSeparator")
+    static let filterSegment = NSToolbarItem.Identifier("filterSegment")
+    static let searchField = NSToolbarItem.Identifier("searchField")
+    static let toggleInspector = NSToolbarItem.Identifier("toggleInspector")
+}
+
+final class MainViewController: NSSplitViewController, SkillListDelegate, DetailViewDelegate, DashboardDelegate, CapabilityMapDelegate, NSToolbarDelegate, NSSearchFieldDelegate {
     private let listVC = SkillListViewController()
     private let markdownVC = MarkdownViewController()
     private let detailVC = DetailViewController()
@@ -12,6 +19,10 @@ final class MainViewController: NSSplitViewController, SkillListDelegate, Detail
     private var fileWatcher: FileWatcher?
     private var currentItems: [SkillItem] = []
 
+    // Toolbar controls (retained for forwarding)
+    private let toolbarSearchField = NSSearchField()
+    private let toolbarSegmentedControl = NSSegmentedControl()
+
     // The center container holds all center-pane views; we toggle visibility
     private let centerContainer = NSView()
 
@@ -22,7 +33,7 @@ final class MainViewController: NSSplitViewController, SkillListDelegate, Detail
         let listItem = NSSplitViewItem(sidebarWithViewController: listVC)
         listItem.minimumThickness = 280
         listItem.maximumThickness = 400
-        listItem.canCollapse = false
+        listItem.canCollapse = true
         listItem.holdingPriority = NSLayoutConstraint.Priority(252)
         addSplitViewItem(listItem)
 
@@ -49,8 +60,8 @@ final class MainViewController: NSSplitViewController, SkillListDelegate, Detail
         centerItem.holdingPriority = NSLayoutConstraint.Priority(250)
         addSplitViewItem(centerItem)
 
-        // Right sidebar (detail/metadata)
-        rightSidebarItem = NSSplitViewItem(viewController: detailVC)
+        // Right sidebar — inspector pattern (overlays content like Xcode)
+        rightSidebarItem = NSSplitViewItem(inspectorWithViewController: detailVC)
         rightSidebarItem.minimumThickness = 220
         rightSidebarItem.maximumThickness = 320
         rightSidebarItem.canCollapse = true
@@ -133,9 +144,77 @@ final class MainViewController: NSSplitViewController, SkillListDelegate, Detail
         dashboardVC.updateWithItems(currentItems)
     }
 
-    // MARK: - Toggle Right Sidebar
+    // toggleInspector(_:) is inherited from NSSplitViewController (macOS 14+)
+    // and automatically toggles the inspector split view item.
 
-    @objc func toggleRightSidebar(_ sender: Any?) {
-        rightSidebarItem.animator().isCollapsed.toggle()
+    // MARK: - NSToolbarDelegate
+
+    func toolbar(_ toolbar: NSToolbar, itemForItemIdentifier itemIdentifier: NSToolbarItem.Identifier, willBeInsertedIntoToolbar flag: Bool) -> NSToolbarItem? {
+        switch itemIdentifier {
+        case .sidebarTrackingSeparator:
+            return NSTrackingSeparatorToolbarItem(identifier: .sidebarTrackingSeparator, splitView: splitView, dividerIndex: 0)
+
+        case .filterSegment:
+            let labels = ["All", "Skill", "Cmd", "Agent", "Plugin", "Hook", "CLAUDE"]
+            toolbarSegmentedControl.segmentCount = labels.count
+            for (i, label) in labels.enumerated() {
+                toolbarSegmentedControl.setLabel(label, forSegment: i)
+            }
+            toolbarSegmentedControl.selectedSegment = 0
+            toolbarSegmentedControl.segmentStyle = .roundRect
+            toolbarSegmentedControl.target = self
+            toolbarSegmentedControl.action = #selector(toolbarFilterChanged(_:))
+
+            let item = NSToolbarItem(itemIdentifier: .filterSegment)
+            item.label = "Filter"
+            item.view = toolbarSegmentedControl
+            return item
+
+        case .searchField:
+            let item = NSSearchToolbarItem(itemIdentifier: .searchField)
+            item.searchField.delegate = self
+            item.searchField.placeholderString = "Search skills..."
+            return item
+
+        case .toggleInspector:
+            let item = NSToolbarItem(itemIdentifier: .toggleInspector)
+            item.label = "Toggle Inspector"
+            item.image = NSImage(systemSymbolName: "sidebar.trailing", accessibilityDescription: "Toggle Inspector")
+            item.action = #selector(NSSplitViewController.toggleInspector(_:))
+            item.isBordered = true
+            return item
+
+        default:
+            return nil
+        }
+    }
+
+    func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
+        [.toggleSidebar, .sidebarTrackingSeparator, .filterSegment, .searchField, .toggleInspector]
+    }
+
+    func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
+        toolbarDefaultItemIdentifiers(toolbar)
+    }
+
+    // MARK: - Toolbar Actions
+
+    @objc private func toolbarFilterChanged(_ sender: NSSegmentedControl) {
+        forwardFilterToList()
+    }
+
+    func controlTextDidChange(_ obj: Notification) {
+        forwardFilterToList()
+    }
+
+    private func forwardFilterToList() {
+        let query: String
+        if let searchItem = view.window?.toolbar?.items.first(where: { $0.itemIdentifier == .searchField }) as? NSSearchToolbarItem {
+            query = searchItem.searchField.stringValue
+        } else {
+            query = ""
+        }
+        let kindIndex = toolbarSegmentedControl.selectedSegment
+        listVC.applyExternalFilter(query: query, kindIndex: kindIndex)
     }
 }

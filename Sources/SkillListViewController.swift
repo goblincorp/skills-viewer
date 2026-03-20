@@ -19,11 +19,9 @@ final class SidebarNode {
     var isGroup: Bool { item?.kind == .plugin && !children.isEmpty }
 }
 
-final class SkillListViewController: NSViewController, NSOutlineViewDataSource, NSOutlineViewDelegate, NSSearchFieldDelegate {
+final class SkillListViewController: NSViewController, NSOutlineViewDataSource, NSOutlineViewDelegate {
     weak var delegate: SkillListDelegate?
 
-    private let searchField = NSSearchField()
-    private let segmentedControl = NSSegmentedControl()
     private let scrollView = NSScrollView()
     private let outlineView = NSOutlineView()
 
@@ -31,6 +29,9 @@ final class SkillListViewController: NSViewController, NSOutlineViewDataSource, 
     private(set) var filteredItems: [SkillItem] = []
     private var rootNodes: [SidebarNode] = []
     private var isGrouped = true
+
+    private var filterQuery: String = ""
+    private var filterKindIndex: Int = 0
 
     private let filterOptions: [(String, ItemKind?)] = [
         ("All", nil),
@@ -45,26 +46,6 @@ final class SkillListViewController: NSViewController, NSOutlineViewDataSource, 
     override func loadView() {
         view = NSView()
 
-        // Search field
-        searchField.placeholderString = "Search skills..."
-        searchField.delegate = self
-        searchField.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(searchField)
-
-        // Segmented control
-        let labels = filterOptions.map(\.0)
-        segmentedControl.segmentCount = labels.count
-        for (i, label) in labels.enumerated() {
-            segmentedControl.setLabel(label, forSegment: i)
-        }
-        segmentedControl.selectedSegment = 0
-        segmentedControl.segmentDistribution = .fillEqually
-        segmentedControl.target = self
-        segmentedControl.action = #selector(filterChanged)
-        segmentedControl.segmentStyle = .roundRect
-        segmentedControl.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(segmentedControl)
-
         // Outline view
         let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("main"))
         column.title = "Skills"
@@ -74,7 +55,7 @@ final class SkillListViewController: NSViewController, NSOutlineViewDataSource, 
         outlineView.dataSource = self
         outlineView.delegate = self
         outlineView.rowHeight = 52
-        outlineView.style = .inset
+        outlineView.style = .sourceList
         outlineView.indentationPerLevel = 16
 
         scrollView.documentView = outlineView
@@ -83,15 +64,7 @@ final class SkillListViewController: NSViewController, NSOutlineViewDataSource, 
         view.addSubview(scrollView)
 
         NSLayoutConstraint.activate([
-            searchField.topAnchor.constraint(equalTo: view.topAnchor, constant: 8),
-            searchField.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 8),
-            searchField.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -8),
-
-            segmentedControl.topAnchor.constraint(equalTo: searchField.bottomAnchor, constant: 8),
-            segmentedControl.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 8),
-            segmentedControl.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -8),
-
-            scrollView.topAnchor.constraint(equalTo: segmentedControl.bottomAnchor, constant: 8),
+            scrollView.topAnchor.constraint(equalTo: view.topAnchor),
             scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             scrollView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
@@ -103,19 +76,19 @@ final class SkillListViewController: NSViewController, NSOutlineViewDataSource, 
         applyFilter()
     }
 
+    // MARK: - External Filter (from toolbar)
+
+    func applyExternalFilter(query: String, kindIndex: Int) {
+        filterQuery = query
+        filterKindIndex = kindIndex
+        applyFilter()
+    }
+
     // MARK: - Filtering
 
-    @objc private func filterChanged() {
-        applyFilter()
-    }
-
-    func controlTextDidChange(_ obj: Notification) {
-        applyFilter()
-    }
-
     private func applyFilter() {
-        let query = searchField.stringValue.lowercased()
-        let selectedKind = filterOptions[segmentedControl.selectedSegment].1
+        let query = filterQuery.lowercased()
+        let selectedKind = filterOptions[filterKindIndex].1
 
         filteredItems = allItems.filter { item in
             if let kind = selectedKind, item.kind != kind { return false }
