@@ -42,6 +42,13 @@ struct SkillItem {
     let path: String
     let argumentHint: String?
     let allowedTools: String?
+    let model: String?
+    let color: String?
+    let tools: String?
+    let keywords: String?
+    let homepage: String?
+    let repository: String?
+    let license: String?
     let directoryPath: String
     let associatedFiles: [AssociatedFile]
     let createdDate: Date?
