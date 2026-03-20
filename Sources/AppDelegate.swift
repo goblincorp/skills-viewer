@@ -7,25 +7,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let mainVC = MainViewController()
 
         window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 900, height: 600),
+            contentRect: NSRect(x: 0, y: 0, width: 1200, height: 600),
             styleMask: [.titled, .closable, .resizable, .miniaturizable],
             backing: .buffered,
             defer: false
         )
         window.title = "Skills Viewer"
-        window.contentMinSize = NSSize(width: 620, height: 400)
+        window.contentMinSize = NSSize(width: 900, height: 400)
         window.contentViewController = mainVC
         window.center()
         window.makeKeyAndOrderFront(nil)
 
-        setupMenuBar()
+        setupMenuBar(mainVC: mainVC)
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         true
     }
 
-    @MainActor private func setupMenuBar() {
+    @MainActor private func setupMenuBar(mainVC: MainViewController) {
         let mainMenu = NSMenu()
 
         // App menu
@@ -46,6 +46,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let editItem = NSMenuItem()
         editItem.submenu = editMenu
         mainMenu.addItem(editItem)
+
+        // View menu
+        let viewMenu = NSMenu(title: "View")
+        let toggleItem = NSMenuItem(
+            title: "Toggle Sidebar",
+            action: #selector(MainViewController.toggleRightSidebar(_:)),
+            keyEquivalent: "s"
+        )
+        toggleItem.keyEquivalentModifierMask = [.command, .option]
+        toggleItem.target = mainVC
+        viewMenu.addItem(toggleItem)
+        let viewMenuItem = NSMenuItem()
+        viewMenuItem.submenu = viewMenu
+        mainMenu.addItem(viewMenuItem)
 
         NSApplication.shared.mainMenu = mainMenu
     }

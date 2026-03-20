@@ -25,6 +25,12 @@ enum ItemKind: String, CaseIterable {
     }
 }
 
+struct AssociatedFile {
+    let name: String
+    let path: String
+    let isMarkdown: Bool
+}
+
 struct SkillItem {
     let name: String
     let description: String
@@ -36,4 +42,6 @@ struct SkillItem {
     let path: String
     let argumentHint: String?
     let allowedTools: String?
+    let directoryPath: String
+    let associatedFiles: [AssociatedFile]
 }

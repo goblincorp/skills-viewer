@@ -25,6 +25,7 @@ struct Scanner {
             let frontmatter = parseFrontmatter(content)
             let name = frontmatter["name"] ?? entry
             let description = frontmatter["description"] ?? ""
+            let associated = discoverAssociatedFiles(in: skillPath, excluding: mdPath)
             items.append(SkillItem(
                 name: name,
                 description: description,
@@ -35,7 +36,9 @@ struct Scanner {
                 pluginName: nil,
                 path: mdPath,
                 argumentHint: frontmatter["argument-hint"],
-                allowedTools: frontmatter["allowed-tools"]
+                allowedTools: frontmatter["allowed-tools"],
+                directoryPath: skillPath,
+                associatedFiles: associated
             ))
         }
         return items
@@ -62,6 +65,7 @@ struct Scanner {
             let authorName = authorDict?["name"]
 
             // Add the plugin itself
+            let pluginAssociated = discoverAssociatedFiles(in: pluginPath, excluding: jsonPath)
             items.append(SkillItem(
                 name: pluginName,
                 description: pluginDesc,
@@ -72,7 +76,9 @@ struct Scanner {
                 pluginName: nil,
                 path: jsonPath,
                 argumentHint: nil,
-                allowedTools: nil
+                allowedTools: nil,
+                directoryPath: pluginPath,
+                associatedFiles: pluginAssociated
             ))
 
             // Scan sub-items: skills/, commands/, agents/
@@ -87,6 +93,8 @@ struct Scanner {
                     guard let content = try? String(contentsOfFile: filePath, encoding: .utf8) else { continue }
                     let frontmatter = parseFrontmatter(content)
                     let itemName = frontmatter["name"] ?? String(file.dropLast(3))
+                    let fileDir = (filePath as NSString).deletingLastPathComponent
+                    let associated = discoverAssociatedFiles(in: fileDir, excluding: filePath)
                     items.append(SkillItem(
                         name: itemName,
                         description: frontmatter["description"] ?? "",
@@ -97,7 +105,9 @@ struct Scanner {
                         pluginName: pluginName,
                         path: filePath,
                         argumentHint: frontmatter["argument-hint"],
-                        allowedTools: frontmatter["allowed-tools"]
+                        allowedTools: frontmatter["allowed-tools"],
+                        directoryPath: fileDir,
+                        associatedFiles: associated
                     ))
                 }
             }
@@ -121,5 +131,49 @@ struct Scanner {
             }
         }
         return result
+    }
+
+    /// Splits file content into frontmatter dict and body text (everything after the closing ---)
+    static func parseSkillFile(_ content: String) -> (frontmatter: [String: String], body: String) {
+        let lines = content.components(separatedBy: "\n")
+        guard lines.first == "---" else { return ([:], content) }
+
+        var frontmatter: [String: String] = [:]
+        var endIndex = 1
+        for i in 1..<lines.count {
+            if lines[i] == "---" {
+                endIndex = i + 1
+                break
+            }
+            if let colonIndex = lines[i].firstIndex(of: ":") {
+                let key = String(lines[i][lines[i].startIndex..<colonIndex]).trimmingCharacters(in: .whitespaces)
+                let value = String(lines[i][lines[i].index(after: colonIndex)...]).trimmingCharacters(in: .whitespaces)
+                frontmatter[key] = value
+            }
+        }
+
+        let body = lines.dropFirst(endIndex).joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
+        return (frontmatter, body)
+    }
+
+    // MARK: - Associated Files
+
+    static func discoverAssociatedFiles(in directory: String, excluding primaryFile: String) -> [AssociatedFile] {
+        let fm = FileManager.default
+        guard let entries = try? fm.contentsOfDirectory(atPath: directory) else { return [] }
+
+        var files: [AssociatedFile] = []
+        for entry in entries.sorted() {
+            let fullPath = (directory as NSString).appendingPathComponent(entry)
+            var isDir: ObjCBool = false
+            guard fm.fileExists(atPath: fullPath, isDirectory: &isDir), !isDir.boolValue else { continue }
+            guard fullPath != primaryFile else { continue }
+            // Skip hidden files
+            guard !entry.hasPrefix(".") else { continue }
+
+            let isMarkdown = entry.hasSuffix(".md")
+            files.append(AssociatedFile(name: entry, path: fullPath, isMarkdown: isMarkdown))
+        }
+        return files
     }
 }
