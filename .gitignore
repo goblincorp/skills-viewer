@@ -3,3 +3,6 @@
 *.xcodeproj/
 .DS_Store
 .context/
+build/
+*.app
+*.dmg
