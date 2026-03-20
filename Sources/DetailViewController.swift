@@ -186,82 +186,100 @@ final class DetailViewController: NSViewController {
         stackView.addArrangedSubview(header)
 
         // Replace literal \n with real newlines
-        var text = raw.replacingOccurrences(of: "\\n", with: "\n")
+        let text = raw.replacingOccurrences(of: "\\n", with: "\n")
 
-        // Strip XML-like tags and extract structure
-        let tagPattern = #"<\/?(example|commentary|context|command-name|example_agent_descriptions)[^>]*>"#
-        let hasStructuredContent = text.range(of: tagPattern, options: .regularExpression) != nil
+        // Extract <example>...</example> blocks via regex
+        let examplePattern = #"<example\b[^>]*>([\s\S]*?)</example>"#
+        let exampleRegex = try? NSRegularExpression(pattern: examplePattern, options: [.dotMatchesLineSeparators])
+        let nsText = text as NSString
+        let exampleMatches = exampleRegex?.matches(in: text, range: NSRange(location: 0, length: nsText.length)) ?? []
 
-        if hasStructuredContent {
-            // Split into main description and examples
-            let parts = text.components(separatedBy: "<example")
-            let mainDesc = parts[0]
-                .replacingOccurrences(of: #"<[^>]+>"#, with: "", options: .regularExpression)
-                .replacingOccurrences(of: "Examples:", with: "")
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-
-            if !mainDesc.isEmpty {
-                let descField = NSTextField(wrappingLabelWithString: mainDesc)
-                descField.font = .systemFont(ofSize: 13)
-                descField.usesSingleLineMode = false
-                descField.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-                stackView.addArrangedSubview(descField)
-            }
-
-            // Show examples
-            if parts.count > 1 {
-                let examplesHeader = NSTextField(labelWithString: "Examples")
-                examplesHeader.font = .systemFont(ofSize: 12, weight: .semibold)
-                examplesHeader.textColor = .secondaryLabelColor
-                stackView.addArrangedSubview(examplesHeader)
-
-                for i in 1..<parts.count {
-                    let exampleText = parts[i]
-                        .replacingOccurrences(of: #"<[^>]+>"#, with: "", options: .regularExpression)
-                        .trimmingCharacters(in: .whitespacesAndNewlines)
-                    guard !exampleText.isEmpty else { continue }
-
-                    // Extract context, user, and assistant lines
-                    let attributed = formatExample(exampleText, index: i)
-                    let exampleField = NSTextField(labelWithString: "")
-                    exampleField.attributedStringValue = attributed
-                    exampleField.usesSingleLineMode = false
-                    exampleField.maximumNumberOfLines = 0
-                    exampleField.lineBreakMode = .byWordWrapping
-                    exampleField.preferredMaxLayoutWidth = 0
-                    exampleField.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-
-                    // Wrap in a subtle box
-                    let box = NSBox()
-                    box.boxType = .custom
-                    box.cornerRadius = 6
-                    box.borderWidth = 0
-                    box.fillColor = .quaternaryLabelColor
-                    box.contentViewMargins = NSSize(width: 10, height: 8)
-                    box.contentView = exampleField
-                    box.translatesAutoresizingMaskIntoConstraints = false
-                    stackView.addArrangedSubview(box)
-                    box.widthAnchor.constraint(equalTo: stackView.widthAnchor, constant: -32).isActive = true
-                }
-            }
-        } else {
-            // No structured content — just clean up and display
-            text = text.replacingOccurrences(of: #"<[^>]+>"#, with: "", options: .regularExpression)
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-            let body = NSTextField(wrappingLabelWithString: text)
-            body.font = .systemFont(ofSize: 13)
-            body.usesSingleLineMode = false
-            body.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-            stackView.addArrangedSubview(body)
+        // Main description = everything outside example blocks, with all tags stripped
+        var mainDesc = text
+        // Remove all <example>...</example> blocks
+        for match in exampleMatches.reversed() {
+            mainDesc = (mainDesc as NSString).replacingCharacters(in: match.range, with: "")
         }
+        // Remove any remaining XML-like tags and "Examples:" label
+        mainDesc = mainDesc.replacingOccurrences(of: #"<[^>]+>"#, with: "", options: .regularExpression)
+            .replacingOccurrences(of: "Examples:", with: "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        if !mainDesc.isEmpty {
+            let descField = NSTextField(wrappingLabelWithString: mainDesc)
+            descField.font = .systemFont(ofSize: 13)
+            descField.usesSingleLineMode = false
+            descField.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+            stackView.addArrangedSubview(descField)
+        }
+
+        // Show examples
+        if !exampleMatches.isEmpty {
+            let examplesHeader = NSTextField(labelWithString: "Examples")
+            examplesHeader.font = .systemFont(ofSize: 12, weight: .semibold)
+            examplesHeader.textColor = .secondaryLabelColor
+            stackView.addArrangedSubview(examplesHeader)
+
+            for match in exampleMatches {
+                let innerRange = match.range(at: 1)
+                var exampleContent = nsText.substring(with: innerRange)
+                // Strip inner tags (commentary, context, etc.)
+                exampleContent = exampleContent.replacingOccurrences(of: #"<[^>]+>"#, with: "", options: .regularExpression)
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !exampleContent.isEmpty else { continue }
+
+                let attributed = formatExample(exampleContent)
+                let exampleField = NSTextField(labelWithString: "")
+                exampleField.attributedStringValue = attributed
+                exampleField.usesSingleLineMode = false
+                exampleField.maximumNumberOfLines = 0
+                exampleField.lineBreakMode = .byWordWrapping
+                exampleField.preferredMaxLayoutWidth = 0
+                exampleField.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+
+                // Wrap in a subtle box
+                let box = NSBox()
+                box.boxType = .custom
+                box.cornerRadius = 6
+                box.borderWidth = 0
+                box.fillColor = .quaternaryLabelColor
+                box.contentViewMargins = NSSize(width: 10, height: 8)
+                box.contentView = exampleField
+                box.translatesAutoresizingMaskIntoConstraints = false
+                stackView.addArrangedSubview(box)
+                box.widthAnchor.constraint(equalTo: stackView.widthAnchor, constant: -32).isActive = true
+            }
+        }
+
+        // If no structured content at all, we already showed it as mainDesc above
     }
 
-    private func formatExample(_ text: String, index: Int) -> NSAttributedString {
+    private func formatExample(_ rawText: String) -> NSAttributedString {
         let result = NSMutableAttributedString()
         let normalFont = NSFont.systemFont(ofSize: 12)
         let boldFont = NSFont.systemFont(ofSize: 12, weight: .semibold)
+        let italicFont = NSFont(descriptor: normalFont.fontDescriptor.withSymbolicTraits(.italic), size: 12) ?? normalFont
         let normalColor = NSColor.labelColor
         let secondaryColor = NSColor.secondaryLabelColor
+
+        // Extract commentary blocks before stripping tags
+        var commentaryTexts: Set<String> = []
+        let commentaryPattern = #"<commentary\b[^>]*>([\s\S]*?)</commentary>"#
+        if let commentaryRegex = try? NSRegularExpression(pattern: commentaryPattern, options: [.dotMatchesLineSeparators]) {
+            let nsRaw = rawText as NSString
+            let matches = commentaryRegex.matches(in: rawText, range: NSRange(location: 0, length: nsRaw.length))
+            for match in matches {
+                let inner = nsRaw.substring(with: match.range(at: 1)).trimmingCharacters(in: .whitespacesAndNewlines)
+                for line in inner.components(separatedBy: "\n") {
+                    let trimmed = line.trimmingCharacters(in: .whitespaces)
+                    if !trimmed.isEmpty { commentaryTexts.insert(trimmed) }
+                }
+            }
+        }
+
+        // Now strip all tags
+        let text = rawText.replacingOccurrences(of: #"<[^>]+>"#, with: "", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
 
         let lines = text.components(separatedBy: "\n")
         for line in lines {
@@ -272,15 +290,19 @@ final class DetailViewController: NSViewController {
                 result.append(NSAttributedString(string: "\n"))
             }
 
-            if trimmed.lowercased().hasPrefix("context:") {
+            let lower = trimmed.lowercased()
+            if commentaryTexts.contains(trimmed) {
+                // Commentary — italic secondary
+                result.append(NSAttributedString(string: trimmed, attributes: [.font: italicFont, .foregroundColor: secondaryColor]))
+            } else if lower.hasPrefix("context:") {
                 let value = String(trimmed.dropFirst(8)).trimmingCharacters(in: .whitespaces)
                 result.append(NSAttributedString(string: "Context: ", attributes: [.font: boldFont, .foregroundColor: secondaryColor]))
                 result.append(NSAttributedString(string: value, attributes: [.font: normalFont, .foregroundColor: secondaryColor]))
-            } else if trimmed.lowercased().hasPrefix("user:") {
+            } else if lower.hasPrefix("user:") {
                 let value = String(trimmed.dropFirst(5)).trimmingCharacters(in: .whitespaces).trimmingCharacters(in: CharacterSet(charactersIn: "\""))
                 result.append(NSAttributedString(string: "User: ", attributes: [.font: boldFont, .foregroundColor: normalColor]))
                 result.append(NSAttributedString(string: value, attributes: [.font: normalFont, .foregroundColor: normalColor]))
-            } else if trimmed.lowercased().hasPrefix("assistant:") {
+            } else if lower.hasPrefix("assistant:") {
                 let value = String(trimmed.dropFirst(10)).trimmingCharacters(in: .whitespaces).trimmingCharacters(in: CharacterSet(charactersIn: "\""))
                 result.append(NSAttributedString(string: "Assistant: ", attributes: [.font: boldFont, .foregroundColor: normalColor]))
                 result.append(NSAttributedString(string: value, attributes: [.font: normalFont, .foregroundColor: normalColor]))
