@@ -11,18 +11,18 @@ final class MainViewController: NSSplitViewController, SkillListDelegate, Detail
         super.viewDidLoad()
 
         // Left sidebar (skill list)
-        let listItem = NSSplitViewItem(viewController: listVC)
+        let listItem = NSSplitViewItem(sidebarWithViewController: listVC)
         listItem.minimumThickness = 280
         listItem.maximumThickness = 400
         listItem.canCollapse = false
-        listItem.holdingPriority = .defaultHigh
+        listItem.holdingPriority = NSLayoutConstraint.Priority(252)
         addSplitViewItem(listItem)
 
         // Center (markdown viewer)
         let markdownItem = NSSplitViewItem(viewController: markdownVC)
         markdownItem.minimumThickness = 400
         markdownItem.canCollapse = false
-        markdownItem.holdingPriority = .defaultLow
+        markdownItem.holdingPriority = NSLayoutConstraint.Priority(250)
         addSplitViewItem(markdownItem)
 
         // Right sidebar (detail/metadata)
@@ -30,7 +30,7 @@ final class MainViewController: NSSplitViewController, SkillListDelegate, Detail
         rightSidebarItem.minimumThickness = 220
         rightSidebarItem.maximumThickness = 320
         rightSidebarItem.canCollapse = true
-        rightSidebarItem.holdingPriority = .defaultHigh
+        rightSidebarItem.holdingPriority = NSLayoutConstraint.Priority(251)
         addSplitViewItem(rightSidebarItem)
 
         listVC.delegate = self
