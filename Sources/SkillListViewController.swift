@@ -5,16 +5,32 @@ protocol SkillListDelegate: AnyObject {
     func skillList(_ controller: SkillListViewController, didSelect item: SkillItem?)
 }
 
-final class SkillListViewController: NSViewController, NSTableViewDataSource, NSTableViewDelegate, NSSearchFieldDelegate {
+final class SidebarNode {
+    let title: String
+    let item: SkillItem?
+    var children: [SidebarNode]
+
+    init(title: String, item: SkillItem?, children: [SidebarNode] = []) {
+        self.title = title
+        self.item = item
+        self.children = children
+    }
+
+    var isGroup: Bool { item?.kind == .plugin && !children.isEmpty }
+}
+
+final class SkillListViewController: NSViewController, NSOutlineViewDataSource, NSOutlineViewDelegate, NSSearchFieldDelegate {
     weak var delegate: SkillListDelegate?
 
     private let searchField = NSSearchField()
     private let segmentedControl = NSSegmentedControl()
     private let scrollView = NSScrollView()
-    private let tableView = NSTableView()
+    private let outlineView = NSOutlineView()
 
     private var allItems: [SkillItem] = []
     private(set) var filteredItems: [SkillItem] = []
+    private var rootNodes: [SidebarNode] = []
+    private var isGrouped = true
 
     private let filterOptions: [(String, ItemKind?)] = [
         ("All", nil),
@@ -49,17 +65,19 @@ final class SkillListViewController: NSViewController, NSTableViewDataSource, NS
         segmentedControl.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(segmentedControl)
 
-        // Table view
+        // Outline view
         let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("main"))
         column.title = "Skills"
-        tableView.addTableColumn(column)
-        tableView.headerView = nil
-        tableView.dataSource = self
-        tableView.delegate = self
-        tableView.rowHeight = 52
-        tableView.style = .inset
+        outlineView.addTableColumn(column)
+        outlineView.outlineTableColumn = column
+        outlineView.headerView = nil
+        outlineView.dataSource = self
+        outlineView.delegate = self
+        outlineView.rowHeight = 52
+        outlineView.style = .inset
+        outlineView.indentationPerLevel = 16
 
-        scrollView.documentView = tableView
+        scrollView.documentView = outlineView
         scrollView.hasVerticalScroller = true
         scrollView.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(scrollView)
@@ -110,53 +128,112 @@ final class SkillListViewController: NSViewController, NSTableViewDataSource, NS
             return true
         }
 
-        tableView.reloadData()
+        // Use grouped tree when "All" filter with empty search, flat list otherwise
+        isGrouped = selectedKind == nil && query.isEmpty
+        buildNodes()
+        outlineView.reloadData()
+
+        if isGrouped {
+            for node in rootNodes where node.isGroup {
+                outlineView.expandItem(node)
+            }
+        }
+
         delegate?.skillList(self, didSelect: nil)
     }
 
-    // MARK: - NSTableViewDataSource
+    private func buildNodes() {
+        if !isGrouped {
+            // Flat list — each item is a root node
+            rootNodes = filteredItems.map { SidebarNode(title: $0.name, item: $0) }
+            return
+        }
 
-    func numberOfRows(in tableView: NSTableView) -> Int {
-        filteredItems.count
+        // Grouped: plugins are parents, their children are nested beneath
+        var pluginNodes: [String: SidebarNode] = [:]
+        var nonPluginNodes: [SidebarNode] = []
+
+        // First pass: create plugin group nodes
+        for item in filteredItems where item.kind == .plugin {
+            let node = SidebarNode(title: item.name, item: item)
+            pluginNodes[item.name] = node
+        }
+
+        // Second pass: assign children or add as root
+        for item in filteredItems {
+            if item.kind == .plugin { continue }
+            if let pluginName = item.pluginName, let parent = pluginNodes[pluginName] {
+                parent.children.append(SidebarNode(title: item.name, item: item))
+            } else {
+                nonPluginNodes.append(SidebarNode(title: item.name, item: item))
+            }
+        }
+
+        // Build root: non-plugin items first, then plugin groups (sorted)
+        let sortedPlugins = pluginNodes.values.sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
+        rootNodes = nonPluginNodes + sortedPlugins
     }
 
-    // MARK: - NSTableViewDelegate
+    // MARK: - NSOutlineViewDataSource
 
-    func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
-        let item = filteredItems[row]
+    func outlineView(_ outlineView: NSOutlineView, numberOfChildrenOfItem item: Any?) -> Int {
+        if let node = item as? SidebarNode {
+            return node.children.count
+        }
+        return rootNodes.count
+    }
+
+    func outlineView(_ outlineView: NSOutlineView, child index: Int, ofItem item: Any?) -> Any {
+        if let node = item as? SidebarNode {
+            return node.children[index]
+        }
+        return rootNodes[index]
+    }
+
+    func outlineView(_ outlineView: NSOutlineView, isItemExpandable item: Any) -> Bool {
+        if let node = item as? SidebarNode {
+            return !node.children.isEmpty
+        }
+        return false
+    }
+
+    // MARK: - NSOutlineViewDelegate
+
+    func outlineView(_ outlineView: NSOutlineView, viewFor tableColumn: NSTableColumn?, item: Any) -> NSView? {
+        guard let node = item as? SidebarNode, let skillItem = node.item else { return nil }
 
         let cellId = NSUserInterfaceItemIdentifier("SkillCell")
         let cell: NSTableCellView
-        if let existing = tableView.makeView(withIdentifier: cellId, owner: nil) as? NSTableCellView {
+        if let existing = outlineView.makeView(withIdentifier: cellId, owner: nil) as? NSTableCellView {
             cell = existing
         } else {
             cell = makeCell(identifier: cellId)
         }
 
-        // Update content
         if let imageView = cell.imageView {
-            imageView.image = NSImage(systemSymbolName: item.kind.sfSymbol, accessibilityDescription: item.kind.displayName)
-            imageView.contentTintColor = colorForKind(item.kind)
+            imageView.image = NSImage(systemSymbolName: skillItem.kind.sfSymbol, accessibilityDescription: skillItem.kind.displayName)
+            imageView.contentTintColor = skillItem.kind.color
         }
         if let textField = cell.textField {
-            textField.stringValue = item.name
+            textField.stringValue = skillItem.name
         }
-        // Description label (tag 100)
         if let descLabel = cell.viewWithTag(100) as? NSTextField {
-            descLabel.stringValue = item.description
+            descLabel.stringValue = skillItem.description
         }
-        // Badge label (tag 101)
         if let badgeLabel = cell.viewWithTag(101) as? NSTextField {
-            badgeLabel.stringValue = item.kind.displayName
+            badgeLabel.stringValue = skillItem.kind.displayName
         }
 
         return cell
     }
 
-    func tableViewSelectionDidChange(_ notification: Notification) {
-        let row = tableView.selectedRow
-        let item = row >= 0 ? filteredItems[row] : nil
-        delegate?.skillList(self, didSelect: item)
+    func outlineViewSelectionDidChange(_ notification: Notification) {
+        let row = outlineView.selectedRow
+        guard row >= 0, let node = outlineView.item(atRow: row) as? SidebarNode else {
+            delegate?.skillList(self, didSelect: nil)
+            return
+        }
+        delegate?.skillList(self, didSelect: node.item)
     }
 
     // MARK: - Cell Factory
@@ -211,16 +288,5 @@ final class SkillListViewController: NSViewController, NSTableViewDataSource, NS
         ])
 
         return cell
-    }
-
-    private func colorForKind(_ kind: ItemKind) -> NSColor {
-        switch kind {
-        case .skill: return .systemBlue
-        case .command: return .systemGreen
-        case .agent: return .systemPurple
-        case .plugin: return .systemOrange
-        case .hook: return .systemRed
-        case .claudeMd: return .systemTeal
-        }
     }
 }

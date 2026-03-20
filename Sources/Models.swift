@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 
 enum SkillSource: String {
@@ -30,6 +31,25 @@ enum ItemKind: String, CaseIterable {
         case .claudeMd: return "doc.text.fill"
         }
     }
+
+    var color: NSColor {
+        switch self {
+        case .skill: return .systemBlue
+        case .command: return .systemGreen
+        case .agent: return .systemPurple
+        case .plugin: return .systemOrange
+        case .hook: return .systemRed
+        case .claudeMd: return .systemTeal
+        }
+    }
+}
+
+struct MCPServer {
+    let name: String
+    let type: String // "http" or "stdio"
+    let url: String?
+    let command: String?
+    let args: [String]
 }
 
 struct AssociatedFile {
@@ -63,5 +83,6 @@ struct SkillItem {
     let hookType: String?
     let matcher: String?
     let hookCommand: String?
+    let mcpServers: [MCPServer]
     let body: String
 }

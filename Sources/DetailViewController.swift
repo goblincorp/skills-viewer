@@ -77,7 +77,7 @@ final class DetailViewController: NSViewController {
         let badgeRow = NSStackView()
         badgeRow.orientation = .horizontal
         badgeRow.spacing = 6
-        badgeRow.addArrangedSubview(makeBadge(item.kind.displayName, color: colorForKind(item.kind)))
+        badgeRow.addArrangedSubview(makeBadge(item.kind.displayName, color: item.kind.color))
         badgeRow.addArrangedSubview(makeBadge(item.source == .local ? "Local" : "Plugin", color: .systemGray))
         stackView.addArrangedSubview(badgeRow)
 
@@ -130,6 +130,46 @@ final class DetailViewController: NSViewController {
         }
         if let hookCommand = item.hookCommand {
             addSection("Command", value: hookCommand)
+        }
+
+        // MCP Servers
+        if !item.mcpServers.isEmpty {
+            addSeparator()
+            let header = NSTextField(labelWithString: "MCP Servers")
+            header.font = .systemFont(ofSize: 12, weight: .semibold)
+            header.textColor = .secondaryLabelColor
+            stackView.addArrangedSubview(header)
+
+            for server in item.mcpServers {
+                let serverRow = NSStackView()
+                serverRow.orientation = .horizontal
+                serverRow.spacing = 6
+
+                let nameLabel = NSTextField(labelWithString: server.name)
+                nameLabel.font = .systemFont(ofSize: 13, weight: .semibold)
+                nameLabel.lineBreakMode = .byTruncatingTail
+                serverRow.addArrangedSubview(nameLabel)
+
+                let typeBadge = makeBadge(server.type, color: server.type == "http" ? .systemBlue : .systemIndigo)
+                serverRow.addArrangedSubview(typeBadge)
+
+                stackView.addArrangedSubview(serverRow)
+
+                if let url = server.url {
+                    let urlLabel = NSTextField(wrappingLabelWithString: url)
+                    urlLabel.font = .monospacedSystemFont(ofSize: 11, weight: .regular)
+                    urlLabel.textColor = .secondaryLabelColor
+                    urlLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+                    stackView.addArrangedSubview(urlLabel)
+                } else if let command = server.command {
+                    let cmdText = ([command] + server.args).joined(separator: " ")
+                    let cmdLabel = NSTextField(wrappingLabelWithString: cmdText)
+                    cmdLabel.font = .monospacedSystemFont(ofSize: 11, weight: .regular)
+                    cmdLabel.textColor = .secondaryLabelColor
+                    cmdLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+                    stackView.addArrangedSubview(cmdLabel)
+                }
+            }
         }
 
         // Dates
@@ -373,17 +413,6 @@ final class DetailViewController: NSViewController {
             label.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -6),
         ])
         return container
-    }
-
-    private func colorForKind(_ kind: ItemKind) -> NSColor {
-        switch kind {
-        case .skill: return .systemBlue
-        case .command: return .systemGreen
-        case .agent: return .systemPurple
-        case .plugin: return .systemOrange
-        case .hook: return .systemRed
-        case .claudeMd: return .systemTeal
-        }
     }
 
     @objc private func revealInFinder() {
