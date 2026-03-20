@@ -5,6 +5,7 @@ struct Scanner {
         var items: [SkillItem] = []
         items.append(contentsOf: scanLocalSkills())
         items.append(contentsOf: scanPlugins())
+        items.append(contentsOf: scanClaudeMdFiles())
         return items.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
     }
 
@@ -22,7 +23,8 @@ struct Scanner {
             guard fm.fileExists(atPath: mdPath),
                   let content = try? String(contentsOfFile: mdPath, encoding: .utf8) else { continue }
 
-            let frontmatter = parseFrontmatter(content)
+            let parsed = parseSkillFile(content)
+            let frontmatter = parsed.frontmatter
             let name = frontmatter["name"] ?? entry
             let description = frontmatter["description"] ?? ""
             let associated = discoverAssociatedFiles(in: skillPath, excluding: mdPath)
@@ -51,7 +53,8 @@ struct Scanner {
                 modifiedDate: dates.modified,
                 hookType: nil,
                 matcher: nil,
-                hookCommand: nil
+                hookCommand: nil,
+                body: parsed.body
             ))
         }
         return items
@@ -104,7 +107,8 @@ struct Scanner {
                 modifiedDate: pluginDates.modified,
                 hookType: nil,
                 matcher: nil,
-                hookCommand: nil
+                hookCommand: nil,
+                body: ""
             ))
 
             // Scan sub-items: skills/, commands/, agents/
@@ -117,7 +121,8 @@ struct Scanner {
                 for file in subEntries where file.hasSuffix(".md") {
                     let filePath = (subPath as NSString).appendingPathComponent(file)
                     guard let content = try? String(contentsOfFile: filePath, encoding: .utf8) else { continue }
-                    let frontmatter = parseFrontmatter(content)
+                    let parsed = parseSkillFile(content)
+                    let frontmatter = parsed.frontmatter
                     let itemName = frontmatter["name"] ?? String(file.dropLast(3))
                     let fileDir = (filePath as NSString).deletingLastPathComponent
                     let associated = discoverAssociatedFiles(in: fileDir, excluding: filePath)
@@ -146,7 +151,8 @@ struct Scanner {
                         modifiedDate: itemDates.modified,
                         hookType: nil,
                         matcher: nil,
-                        hookCommand: nil
+                        hookCommand: nil,
+                        body: parsed.body
                     ))
                 }
             }
@@ -190,7 +196,8 @@ struct Scanner {
                                     modifiedDate: hooksDates.modified,
                                     hookType: eventType,
                                     matcher: entryMatcher,
-                                    hookCommand: command
+                                    hookCommand: command,
+                                    body: ""
                                 ))
                             }
                         }
@@ -199,6 +206,45 @@ struct Scanner {
             }
         }
         return items
+    }
+
+    // MARK: - CLAUDE.md Files
+
+    static func scanClaudeMdFiles() -> [SkillItem] {
+        let claudeMdPath = NSString(string: "~/.claude/CLAUDE.md").expandingTildeInPath
+        let fm = FileManager.default
+        guard fm.fileExists(atPath: claudeMdPath),
+              let content = try? String(contentsOfFile: claudeMdPath, encoding: .utf8) else { return [] }
+
+        let dates = fileDates(at: claudeMdPath)
+        let dirPath = (claudeMdPath as NSString).deletingLastPathComponent
+        return [SkillItem(
+            name: "CLAUDE.md (Global)",
+            description: "Global Claude Code configuration",
+            version: nil,
+            author: nil,
+            source: .local,
+            kind: .claudeMd,
+            pluginName: nil,
+            path: claudeMdPath,
+            argumentHint: nil,
+            allowedTools: nil,
+            model: nil,
+            color: nil,
+            tools: nil,
+            keywords: nil,
+            homepage: nil,
+            repository: nil,
+            license: nil,
+            directoryPath: dirPath,
+            associatedFiles: [],
+            createdDate: dates.created,
+            modifiedDate: dates.modified,
+            hookType: nil,
+            matcher: nil,
+            hookCommand: nil,
+            body: content
+        )]
     }
 
     // MARK: - Frontmatter

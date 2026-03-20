@@ -44,6 +44,7 @@ final class MainViewController: NSSplitViewController, SkillListDelegate, Detail
         // Watch for file changes
         let home = FileManager.default.homeDirectoryForCurrentUser.path
         fileWatcher = FileWatcher(paths: [
+            "\(home)/.claude",
             "\(home)/.claude/skills",
             "\(home)/.claude/plugins",
         ]) { [weak self] in

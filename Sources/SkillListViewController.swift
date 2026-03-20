@@ -23,6 +23,7 @@ final class SkillListViewController: NSViewController, NSTableViewDataSource, NS
         ("Agent", .agent),
         ("Plugin", .plugin),
         ("Hook", .hook),
+        ("CLAUDE", .claudeMd),
     ]
 
     override func loadView() {
@@ -103,7 +104,8 @@ final class SkillListViewController: NSViewController, NSTableViewDataSource, NS
             if !query.isEmpty {
                 let matchesName = item.name.lowercased().contains(query)
                 let matchesDesc = item.description.lowercased().contains(query)
-                if !matchesName && !matchesDesc { return false }
+                let matchesBody = item.body.lowercased().contains(query)
+                if !matchesName && !matchesDesc && !matchesBody { return false }
             }
             return true
         }
@@ -218,6 +220,7 @@ final class SkillListViewController: NSViewController, NSTableViewDataSource, NS
         case .agent: return .systemPurple
         case .plugin: return .systemOrange
         case .hook: return .systemRed
+        case .claudeMd: return .systemTeal
         }
     }
 }
