@@ -54,6 +54,7 @@ struct Scanner {
                 hookType: nil,
                 matcher: nil,
                 hookCommand: nil,
+                mcpServers: [],
                 body: parsed.body
             ))
         }
@@ -79,6 +80,9 @@ struct Scanner {
             let pluginDesc = json["description"] as? String ?? ""
             let authorDict = json["author"] as? [String: String]
             let authorName = authorDict?["name"]
+
+            // Scan MCP servers for this plugin
+            let mcpServers = scanMCPServers(in: pluginPath)
 
             // Add the plugin itself
             let pluginAssociated = discoverAssociatedFiles(in: pluginPath, excluding: jsonPath)
@@ -108,6 +112,7 @@ struct Scanner {
                 hookType: nil,
                 matcher: nil,
                 hookCommand: nil,
+                mcpServers: mcpServers,
                 body: ""
             ))
 
@@ -152,6 +157,7 @@ struct Scanner {
                         hookType: nil,
                         matcher: nil,
                         hookCommand: nil,
+                        mcpServers: [],
                         body: parsed.body
                     ))
                 }
@@ -197,6 +203,7 @@ struct Scanner {
                                     hookType: eventType,
                                     matcher: entryMatcher,
                                     hookCommand: command,
+                                    mcpServers: [],
                                     body: ""
                                 ))
                             }
@@ -206,6 +213,44 @@ struct Scanner {
             }
         }
         return items
+    }
+
+    // MARK: - MCP Servers
+
+    static func scanMCPServers(in pluginPath: String) -> [MCPServer] {
+        let mcpJsonPath = (pluginPath as NSString).appendingPathComponent(".mcp.json")
+        let fm = FileManager.default
+        guard fm.fileExists(atPath: mcpJsonPath),
+              let data = try? Data(contentsOf: URL(fileURLWithPath: mcpJsonPath)),
+              let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else {
+            return []
+        }
+
+        // Handle two formats: flat {"server-name": {...}} and wrapped {"mcpServers": {...}}
+        let serversDict: [String: Any]
+        if let wrapped = json["mcpServers"] as? [String: Any] {
+            serversDict = wrapped
+        } else {
+            serversDict = json
+        }
+
+        var servers: [MCPServer] = []
+        for (name, value) in serversDict {
+            guard let config = value as? [String: Any] else { continue }
+            let url = config["url"] as? String
+            let command = config["command"] as? String
+            let args = config["args"] as? [String] ?? []
+            let type: String
+            if url != nil {
+                type = "http"
+            } else if command != nil {
+                type = "stdio"
+            } else {
+                type = config["type"] as? String ?? "unknown"
+            }
+            servers.append(MCPServer(name: name, type: type, url: url, command: command, args: args))
+        }
+        return servers.sorted { $0.name < $1.name }
     }
 
     // MARK: - CLAUDE.md Files
@@ -243,6 +288,7 @@ struct Scanner {
             hookType: nil,
             matcher: nil,
             hookCommand: nil,
+            mcpServers: [],
             body: content
         )]
     }
