@@ -101,6 +101,27 @@ final class DetailViewController: NSViewController {
         if let tools = item.allowedTools {
             addSection("Allowed Tools", value: tools)
         }
+        if let model = item.model {
+            addSection("Model", value: model)
+        }
+        if let tools = item.tools {
+            addSection("Tools", value: tools)
+        }
+        if let keywords = item.keywords {
+            addSection("Keywords", value: keywords)
+        }
+        if let homepage = item.homepage {
+            addSection("Homepage", value: homepage)
+        }
+        if let repository = item.repository {
+            addSection("Repository", value: repository)
+        }
+        if let license = item.license {
+            addSection("License", value: license)
+        }
+        if let color = item.color {
+            addSection("Color", value: color)
+        }
 
         // Dates
         if item.createdDate != nil || item.modifiedDate != nil {
