@@ -11,9 +11,13 @@ enum ItemKind: String, CaseIterable {
     case agent
     case plugin
     case hook
+    case claudeMd
 
     var displayName: String {
-        rawValue.capitalized
+        switch self {
+        case .claudeMd: return "CLAUDE.md"
+        default: return rawValue.capitalized
+        }
     }
 
     var sfSymbol: String {
@@ -23,6 +27,7 @@ enum ItemKind: String, CaseIterable {
         case .agent: return "cpu.fill"
         case .plugin: return "puzzlepiece.fill"
         case .hook: return "bolt.fill"
+        case .claudeMd: return "doc.text.fill"
         }
     }
 }
@@ -58,4 +63,5 @@ struct SkillItem {
     let hookType: String?
     let matcher: String?
     let hookCommand: String?
+    let body: String
 }

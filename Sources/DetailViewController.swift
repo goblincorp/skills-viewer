@@ -382,6 +382,7 @@ final class DetailViewController: NSViewController {
         case .agent: return .systemPurple
         case .plugin: return .systemOrange
         case .hook: return .systemRed
+        case .claudeMd: return .systemTeal
         }
     }
 
