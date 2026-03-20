@@ -6,6 +6,7 @@ final class MainViewController: NSSplitViewController, SkillListDelegate, Detail
     private let detailVC = DetailViewController()
 
     private var rightSidebarItem: NSSplitViewItem!
+    private var fileWatcher: FileWatcher?
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -37,6 +38,21 @@ final class MainViewController: NSSplitViewController, SkillListDelegate, Detail
         detailVC.delegate = self
 
         // Load items
+        let items = Scanner.scanAll()
+        listVC.setItems(items)
+
+        // Watch for file changes
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        fileWatcher = FileWatcher(paths: [
+            "\(home)/.claude/skills",
+            "\(home)/.claude/plugins",
+        ]) { [weak self] in
+            self?.reloadItems()
+        }
+        fileWatcher?.start()
+    }
+
+    private func reloadItems() {
         let items = Scanner.scanAll()
         listVC.setItems(items)
     }
