@@ -22,6 +22,7 @@ final class SkillListViewController: NSViewController, NSTableViewDataSource, NS
         ("Cmd", .command),
         ("Agent", .agent),
         ("Plugin", .plugin),
+        ("Hook", .hook),
     ]
 
     override func loadView() {
@@ -216,6 +217,7 @@ final class SkillListViewController: NSViewController, NSTableViewDataSource, NS
         case .command: return .systemGreen
         case .agent: return .systemPurple
         case .plugin: return .systemOrange
+        case .hook: return .systemRed
         }
     }
 }

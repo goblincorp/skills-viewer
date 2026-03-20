@@ -10,6 +10,7 @@ enum ItemKind: String, CaseIterable {
     case command
     case agent
     case plugin
+    case hook
 
     var displayName: String {
         rawValue.capitalized
@@ -21,6 +22,7 @@ enum ItemKind: String, CaseIterable {
         case .command: return "terminal.fill"
         case .agent: return "cpu.fill"
         case .plugin: return "puzzlepiece.fill"
+        case .hook: return "bolt.fill"
         }
     }
 }
@@ -53,4 +55,7 @@ struct SkillItem {
     let associatedFiles: [AssociatedFile]
     let createdDate: Date?
     let modifiedDate: Date?
+    let hookType: String?
+    let matcher: String?
+    let hookCommand: String?
 }

@@ -48,7 +48,10 @@ struct Scanner {
                 directoryPath: skillPath,
                 associatedFiles: associated,
                 createdDate: dates.created,
-                modifiedDate: dates.modified
+                modifiedDate: dates.modified,
+                hookType: nil,
+                matcher: nil,
+                hookCommand: nil
             ))
         }
         return items
@@ -98,7 +101,10 @@ struct Scanner {
                 directoryPath: pluginPath,
                 associatedFiles: pluginAssociated,
                 createdDate: pluginDates.created,
-                modifiedDate: pluginDates.modified
+                modifiedDate: pluginDates.modified,
+                hookType: nil,
+                matcher: nil,
+                hookCommand: nil
             ))
 
             // Scan sub-items: skills/, commands/, agents/
@@ -137,8 +143,58 @@ struct Scanner {
                         directoryPath: fileDir,
                         associatedFiles: associated,
                         createdDate: itemDates.created,
-                        modifiedDate: itemDates.modified
+                        modifiedDate: itemDates.modified,
+                        hookType: nil,
+                        matcher: nil,
+                        hookCommand: nil
                     ))
+                }
+            }
+
+            // Scan hooks/hooks.json
+            let hooksJsonPath = (pluginPath as NSString).appendingPathComponent("hooks/hooks.json")
+            if fm.fileExists(atPath: hooksJsonPath),
+               let hooksData = try? Data(contentsOf: URL(fileURLWithPath: hooksJsonPath)),
+               let hooksJson = (try? JSONSerialization.jsonObject(with: hooksData)) as? [String: Any] {
+                let hooksDesc = hooksJson["description"] as? String ?? ""
+                let hooksDates = fileDates(at: hooksJsonPath)
+                if let hooksDict = hooksJson["hooks"] as? [String: Any] {
+                    for (eventType, value) in hooksDict {
+                        guard let entries = value as? [[String: Any]] else { continue }
+                        for hookEntry in entries {
+                            let entryMatcher = hookEntry["matcher"] as? String
+                            let hookCommands = hookEntry["hooks"] as? [[String: Any]] ?? []
+                            for hookCmd in hookCommands {
+                                let command = hookCmd["command"] as? String ?? ""
+                                items.append(SkillItem(
+                                    name: eventType,
+                                    description: hooksDesc,
+                                    version: nil,
+                                    author: authorName,
+                                    source: .plugin,
+                                    kind: .hook,
+                                    pluginName: pluginName,
+                                    path: hooksJsonPath,
+                                    argumentHint: nil,
+                                    allowedTools: nil,
+                                    model: nil,
+                                    color: nil,
+                                    tools: nil,
+                                    keywords: nil,
+                                    homepage: nil,
+                                    repository: nil,
+                                    license: nil,
+                                    directoryPath: (hooksJsonPath as NSString).deletingLastPathComponent,
+                                    associatedFiles: [],
+                                    createdDate: hooksDates.created,
+                                    modifiedDate: hooksDates.modified,
+                                    hookType: eventType,
+                                    matcher: entryMatcher,
+                                    hookCommand: command
+                                ))
+                            }
+                        }
+                    }
                 }
             }
         }
