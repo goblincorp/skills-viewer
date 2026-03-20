@@ -85,6 +85,7 @@ mkdir -p "$CONTENTS/Resources"
 
 cp "$RELEASE_BIN" "$CONTENTS/MacOS/$APP_NAME"
 cp "Resources/Info.plist" "$CONTENTS/Info.plist"
+cp "Resources/AppIcon.icns" "$CONTENTS/Resources/AppIcon.icns"
 
 echo "    $APP_PATH"
 
