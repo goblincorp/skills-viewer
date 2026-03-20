@@ -122,6 +122,15 @@ final class DetailViewController: NSViewController {
         if let color = item.color {
             addSection("Color", value: color)
         }
+        if let hookType = item.hookType {
+            addSection("Hook Type", value: hookType)
+        }
+        if let matcher = item.matcher {
+            addSection("Matcher", value: matcher)
+        }
+        if let hookCommand = item.hookCommand {
+            addSection("Command", value: hookCommand)
+        }
 
         // Dates
         if item.createdDate != nil || item.modifiedDate != nil {
@@ -372,6 +381,7 @@ final class DetailViewController: NSViewController {
         case .command: return .systemGreen
         case .agent: return .systemPurple
         case .plugin: return .systemOrange
+        case .hook: return .systemRed
         }
     }
 
