@@ -26,6 +26,7 @@ struct Scanner {
             let name = frontmatter["name"] ?? entry
             let description = frontmatter["description"] ?? ""
             let associated = discoverAssociatedFiles(in: skillPath, excluding: mdPath)
+            let dates = fileDates(at: mdPath)
             items.append(SkillItem(
                 name: name,
                 description: description,
@@ -38,7 +39,9 @@ struct Scanner {
                 argumentHint: frontmatter["argument-hint"],
                 allowedTools: frontmatter["allowed-tools"],
                 directoryPath: skillPath,
-                associatedFiles: associated
+                associatedFiles: associated,
+                createdDate: dates.created,
+                modifiedDate: dates.modified
             ))
         }
         return items
@@ -66,6 +69,7 @@ struct Scanner {
 
             // Add the plugin itself
             let pluginAssociated = discoverAssociatedFiles(in: pluginPath, excluding: jsonPath)
+            let pluginDates = fileDates(at: jsonPath)
             items.append(SkillItem(
                 name: pluginName,
                 description: pluginDesc,
@@ -78,7 +82,9 @@ struct Scanner {
                 argumentHint: nil,
                 allowedTools: nil,
                 directoryPath: pluginPath,
-                associatedFiles: pluginAssociated
+                associatedFiles: pluginAssociated,
+                createdDate: pluginDates.created,
+                modifiedDate: pluginDates.modified
             ))
 
             // Scan sub-items: skills/, commands/, agents/
@@ -95,6 +101,7 @@ struct Scanner {
                     let itemName = frontmatter["name"] ?? String(file.dropLast(3))
                     let fileDir = (filePath as NSString).deletingLastPathComponent
                     let associated = discoverAssociatedFiles(in: fileDir, excluding: filePath)
+                    let itemDates = fileDates(at: filePath)
                     items.append(SkillItem(
                         name: itemName,
                         description: frontmatter["description"] ?? "",
@@ -107,7 +114,9 @@ struct Scanner {
                         argumentHint: frontmatter["argument-hint"],
                         allowedTools: frontmatter["allowed-tools"],
                         directoryPath: fileDir,
-                        associatedFiles: associated
+                        associatedFiles: associated,
+                        createdDate: itemDates.created,
+                        modifiedDate: itemDates.modified
                     ))
                 }
             }
@@ -154,6 +163,15 @@ struct Scanner {
 
         let body = lines.dropFirst(endIndex).joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
         return (frontmatter, body)
+    }
+
+    // MARK: - File Dates
+
+    static func fileDates(at path: String) -> (created: Date?, modified: Date?) {
+        guard let attrs = try? FileManager.default.attributesOfItem(atPath: path) else {
+            return (nil, nil)
+        }
+        return (attrs[.creationDate] as? Date, attrs[.modificationDate] as? Date)
     }
 
     // MARK: - Associated Files

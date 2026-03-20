@@ -83,7 +83,7 @@ final class DetailViewController: NSViewController {
 
         // Description
         if !item.description.isEmpty {
-            addSection("Description", value: item.description)
+            addFormattedDescription(item.description)
         }
 
         if let pluginName = item.pluginName {
@@ -100,6 +100,20 @@ final class DetailViewController: NSViewController {
         }
         if let tools = item.allowedTools {
             addSection("Allowed Tools", value: tools)
+        }
+
+        // Dates
+        if item.createdDate != nil || item.modifiedDate != nil {
+            addSeparator()
+            let dateFormatter = DateFormatter()
+            dateFormatter.dateStyle = .medium
+            dateFormatter.timeStyle = .none
+            if let modified = item.modifiedDate {
+                addSection("Modified", value: dateFormatter.string(from: modified))
+            }
+            if let created = item.createdDate {
+                addSection("Created", value: dateFormatter.string(from: created))
+            }
         }
 
         // Associated markdown files
@@ -163,6 +177,119 @@ final class DetailViewController: NSViewController {
         body.usesSingleLineMode = false
         body.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         stackView.addArrangedSubview(body)
+    }
+
+    private func addFormattedDescription(_ raw: String) {
+        let header = NSTextField(labelWithString: "Description")
+        header.font = .systemFont(ofSize: 12, weight: .semibold)
+        header.textColor = .secondaryLabelColor
+        stackView.addArrangedSubview(header)
+
+        // Replace literal \n with real newlines
+        var text = raw.replacingOccurrences(of: "\\n", with: "\n")
+
+        // Strip XML-like tags and extract structure
+        let tagPattern = #"<\/?(example|commentary|context|command-name|example_agent_descriptions)[^>]*>"#
+        let hasStructuredContent = text.range(of: tagPattern, options: .regularExpression) != nil
+
+        if hasStructuredContent {
+            // Split into main description and examples
+            let parts = text.components(separatedBy: "<example")
+            let mainDesc = parts[0]
+                .replacingOccurrences(of: #"<[^>]+>"#, with: "", options: .regularExpression)
+                .replacingOccurrences(of: "Examples:", with: "")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+
+            if !mainDesc.isEmpty {
+                let descField = NSTextField(wrappingLabelWithString: mainDesc)
+                descField.font = .systemFont(ofSize: 13)
+                descField.usesSingleLineMode = false
+                descField.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+                stackView.addArrangedSubview(descField)
+            }
+
+            // Show examples
+            if parts.count > 1 {
+                let examplesHeader = NSTextField(labelWithString: "Examples")
+                examplesHeader.font = .systemFont(ofSize: 12, weight: .semibold)
+                examplesHeader.textColor = .secondaryLabelColor
+                stackView.addArrangedSubview(examplesHeader)
+
+                for i in 1..<parts.count {
+                    let exampleText = parts[i]
+                        .replacingOccurrences(of: #"<[^>]+>"#, with: "", options: .regularExpression)
+                        .trimmingCharacters(in: .whitespacesAndNewlines)
+                    guard !exampleText.isEmpty else { continue }
+
+                    // Extract context, user, and assistant lines
+                    let attributed = formatExample(exampleText, index: i)
+                    let exampleField = NSTextField(labelWithString: "")
+                    exampleField.attributedStringValue = attributed
+                    exampleField.usesSingleLineMode = false
+                    exampleField.maximumNumberOfLines = 0
+                    exampleField.lineBreakMode = .byWordWrapping
+                    exampleField.preferredMaxLayoutWidth = 0
+                    exampleField.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+
+                    // Wrap in a subtle box
+                    let box = NSBox()
+                    box.boxType = .custom
+                    box.cornerRadius = 6
+                    box.borderWidth = 0
+                    box.fillColor = .quaternaryLabelColor
+                    box.contentViewMargins = NSSize(width: 10, height: 8)
+                    box.contentView = exampleField
+                    box.translatesAutoresizingMaskIntoConstraints = false
+                    stackView.addArrangedSubview(box)
+                    box.widthAnchor.constraint(equalTo: stackView.widthAnchor, constant: -32).isActive = true
+                }
+            }
+        } else {
+            // No structured content — just clean up and display
+            text = text.replacingOccurrences(of: #"<[^>]+>"#, with: "", options: .regularExpression)
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            let body = NSTextField(wrappingLabelWithString: text)
+            body.font = .systemFont(ofSize: 13)
+            body.usesSingleLineMode = false
+            body.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+            stackView.addArrangedSubview(body)
+        }
+    }
+
+    private func formatExample(_ text: String, index: Int) -> NSAttributedString {
+        let result = NSMutableAttributedString()
+        let normalFont = NSFont.systemFont(ofSize: 12)
+        let boldFont = NSFont.systemFont(ofSize: 12, weight: .semibold)
+        let normalColor = NSColor.labelColor
+        let secondaryColor = NSColor.secondaryLabelColor
+
+        let lines = text.components(separatedBy: "\n")
+        for line in lines {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            guard !trimmed.isEmpty else { continue }
+
+            if !result.string.isEmpty {
+                result.append(NSAttributedString(string: "\n"))
+            }
+
+            if trimmed.lowercased().hasPrefix("context:") {
+                let value = String(trimmed.dropFirst(8)).trimmingCharacters(in: .whitespaces)
+                result.append(NSAttributedString(string: "Context: ", attributes: [.font: boldFont, .foregroundColor: secondaryColor]))
+                result.append(NSAttributedString(string: value, attributes: [.font: normalFont, .foregroundColor: secondaryColor]))
+            } else if trimmed.lowercased().hasPrefix("user:") {
+                let value = String(trimmed.dropFirst(5)).trimmingCharacters(in: .whitespaces).trimmingCharacters(in: CharacterSet(charactersIn: "\""))
+                result.append(NSAttributedString(string: "User: ", attributes: [.font: boldFont, .foregroundColor: normalColor]))
+                result.append(NSAttributedString(string: value, attributes: [.font: normalFont, .foregroundColor: normalColor]))
+            } else if trimmed.lowercased().hasPrefix("assistant:") {
+                let value = String(trimmed.dropFirst(10)).trimmingCharacters(in: .whitespaces).trimmingCharacters(in: CharacterSet(charactersIn: "\""))
+                result.append(NSAttributedString(string: "Assistant: ", attributes: [.font: boldFont, .foregroundColor: normalColor]))
+                result.append(NSAttributedString(string: value, attributes: [.font: normalFont, .foregroundColor: normalColor]))
+            } else {
+                result.append(NSAttributedString(string: trimmed, attributes: [.font: normalFont, .foregroundColor: secondaryColor]))
+            }
+        }
+
+        return result
     }
 
     private func addSeparator() {

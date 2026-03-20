@@ -44,4 +44,6 @@ struct SkillItem {
     let allowedTools: String?
     let directoryPath: String
     let associatedFiles: [AssociatedFile]
+    let createdDate: Date?
+    let modifiedDate: Date?
 }
